@@ -4,13 +4,13 @@ const int ledPin = 3;
 const int resetpin = 4;
 const int onboardLED = 13; 
 
-// 150 samples * 5ms interval = 750ms (3/4 second capture window)
-const int numSamples = 150; 
+// 200 samples * 5ms interval = 1000ms (1 second capture window)
+const int numSamples = 200; 
 int features[numSamples];
 
 int ambientNoiseAverage = 0;
 int threshold = 0;
-const int thresholdMargin = 4; 
+const int thresholdMargin = 15; 
 
 void setup() {
   Serial.begin(115200); 
@@ -43,7 +43,7 @@ void calibrateEnvironment() {
   
   digitalWrite(onboardLED, LOW);
   
-  Serial.print("\n calliberation done threshold = ")  ;
+  Serial.print("\n calliberation done threshold = ");
   Serial.print(threshold);
   Serial.println();
 }
@@ -66,6 +66,7 @@ void loop() {
   long captureSum = 0;
   Serial.println("speakup");
   delay(100);
+  
   for (int i = 0; i < numSamples; i++) {
     features[i] = analogRead(micPin) - threshold;
     captureSum += features[i];
@@ -81,11 +82,11 @@ void loop() {
   Serial.print("average reading = ");
   Serial.println(currentCaptureAverage);
   
-  // You explicitly requested printing only the first 20. 
-  // To save the full matrix, change 20 to 'numSamples'.
-  int printCount = 100; 
+  // Print exactly 100 values sequentially downwards for Python to parse
+  int printCount = 200; 
   for (int i = 0; i < printCount; i++) {
-    Serial.print(features[i]);
+    // CRITICAL FIX: Serial.println ensures each value is on its own line
+    Serial.println(features[i]); 
     delay(2); 
   }
   
