@@ -50,7 +50,7 @@ model.compile(optimizer='adam',
 
 # Train the model
 print("Commencing Model Training...")
-history = model.fit(X_train_scaled, y_train, epochs=300, batch_size=16, validation_data=(X_test_scaled, y_test))
+history = model.fit(X_train_scaled, y_train, epochs=3000, batch_size=16, validation_data=(X_test_scaled, y_test))
 # Evaluate final accuracy
 test_loss, test_acc = model.evaluate(X_test_scaled, y_test, verbose=0)
 print(f"\nFinal Test Accuracy: {test_acc * 100:.2f}%")
