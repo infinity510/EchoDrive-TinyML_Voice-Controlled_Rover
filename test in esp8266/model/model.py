@@ -23,10 +23,9 @@ y = df['Label'].values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True, stratify=y)
 
 # Feature Scaling (Crucial for Neural Network gradient descent convergence)
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
+# Replace the StandardScaler lines with this:
+X_train_scaled = X_train / 512.0
+X_test_scaled = X_test / 512.0
 # ==========================================
 # 2. NEURAL NETWORK ARCHITECTURE
 # ==========================================
@@ -51,8 +50,7 @@ model.compile(optimizer='adam',
 
 # Train the model
 print("Commencing Model Training...")
-history = model.fit(X_train_scaled, y_train, epochs=3000, batch_size=16, validation_data=(X_test_scaled, y_test), verbose=1)
-
+history = model.fit(X_train_scaled, y_train, epochs=300, batch_size=16, validation_data=(X_test_scaled, y_test))
 # Evaluate final accuracy
 test_loss, test_acc = model.evaluate(X_test_scaled, y_test, verbose=0)
 print(f"\nFinal Test Accuracy: {test_acc * 100:.2f}%")
