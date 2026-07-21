@@ -18,8 +18,8 @@ y = df.iloc[:, -1].values.astype('int32')
 # Normalize the 12-bit ESP32 data (0 to 4095) to float values between 0.0 and 1.0
 X = X / 4095.0
 
-# Split into 80% training and 20% validation sets
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+# Split into 80% training and 20% test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # ==========================================
 # 2. NEURAL NETWORK ARCHITECTURE
@@ -28,11 +28,11 @@ model = models.Sequential([
     layers.InputLayer(input_shape=(800,)),
     
     # Hidden layers designed to compress the large 800-element array
-    layers.Dense(128, activation='relu'),
-    layers.Dropout(0.3), # Prevents overfitting to background noise
-    layers.Dense(64, activation='relu'),
+    layers.Dense(158, activation='relu'),
+    layers.Dropout(0.3), 
+    layers.Dense(80, activation='relu'),
     layers.Dropout(0.2),
-    layers.Dense(32, activation='relu'),
+    layers.Dense(40, activation='relu'),
     
     # Output layer: 3 classes (Front, Reverse, Noise) using Softmax for probabilities
     layers.Dense(3, activation='softmax')
@@ -43,10 +43,22 @@ model.compile(optimizer='adam',
               metrics=['accuracy'])
 
 print("Starting model training...")
-history = model.fit(X_train, y_train, epochs=500, batch_size=16, validation_data=(X_val, y_val))
+# The test set is passed as validation_data to track metrics during epochs
+history = model.fit(X_train, y_train, epochs=1000, batch_size=16, validation_data=(X_test, y_test))
 
 # ==========================================
-# 3. TENSORFLOW LITE MICRO CONVERSION
+# 3. TEST DATASET EVALUATION 
+# ==========================================
+print("\nEvaluating model against the reserved unseen test dataset...")
+test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+
+print("\n" + "="*50)
+print(f"FINAL TEST ACCURACY: {test_accuracy * 100:.2f}%")
+print(f"FINAL TEST LOSS:     {test_loss:.4f}")
+print("="*50 + "\n")
+
+# ==========================================
+# 4. TENSORFLOW LITE MICRO CONVERSION
 # ==========================================
 print("Converting model to TensorFlow Lite format...")
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
@@ -58,7 +70,7 @@ with open("model.tflite", "wb") as f:
     f.write(tflite_model)
 
 # ==========================================
-# 4. C++ HEADER FILE GENERATION
+# 5. C++ HEADER FILE GENERATION
 # ==========================================
 print("Generating model_data.h for ESP32...")
 
