@@ -43,7 +43,7 @@ model.compile(optimizer='adam',
               metrics=['accuracy'])
 
 print("Starting model training...")
-history = model.fit(X_train, y_train, epochs=50, batch_size=16, validation_data=(X_val, y_val))
+history = model.fit(X_train, y_train, epochs=500, batch_size=16, validation_data=(X_val, y_val))
 
 # ==========================================
 # 3. TENSORFLOW LITE MICRO CONVERSION
