@@ -28,11 +28,11 @@ model = models.Sequential([
     layers.InputLayer(input_shape=(800,)),
     
     # Hidden layers designed to compress the large 800-element array
-    layers.Dense(158, activation='relu'),
+    layers.Dense(128, activation='relu'),
     layers.Dropout(0.3), 
-    layers.Dense(80, activation='relu'),
+    layers.Dense(64, activation='relu'),
     layers.Dropout(0.2),
-    layers.Dense(40, activation='relu'),
+    layers.Dense(32, activation='relu'),
     
     # Output layer: 3 classes (Front, Reverse, Noise) using Softmax for probabilities
     layers.Dense(3, activation='softmax')
@@ -44,7 +44,7 @@ model.compile(optimizer='adam',
 
 print("Starting model training...")
 # The test set is passed as validation_data to track metrics during epochs
-history = model.fit(X_train, y_train, epochs=1000, batch_size=16, validation_data=(X_test, y_test))
+history = model.fit(X_train, y_train, epochs=100, batch_size=16, validation_data=(X_test, y_test))
 
 # ==========================================
 # 3. TEST DATASET EVALUATION 
@@ -62,7 +62,7 @@ print("="*50 + "\n")
 # ==========================================
 print("Converting model to TensorFlow Lite format...")
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
-converter.optimizations = [tf.lite.Optimize.DEFAULT]
+#converter.optimizations = [tf.lite.Optimize.DEFAULT]
 tflite_model = converter.convert()
 
 # Save the raw .tflite binary
