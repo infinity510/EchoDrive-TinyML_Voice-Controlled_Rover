@@ -1,46 +1,40 @@
-import pandas as pd
 import numpy as np
-import json
+import pandas as pd
 import tensorflow as tf
-from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from tensorflow.keras import layers, models
+import os
 
 # ==========================================
-# 1. DATA INGESTION & JUMBLING
+# 1. DATA INGESTION & PREPROCESSING
 # ==========================================
-df = pd.read_csv('acoustic_dataset_2D.csv')
+print("Loading dataset.csv...")
+df = pd.read_csv('dataset.csv')
 
-def extract_amplitudes(json_str):
-    data = json.loads(json_str)
-    return [pair[1] for pair in data]
+# Separate features (800 columns) and labels (last column)
+X = df.iloc[:, :-1].values.astype('float32')
+y = df.iloc[:, -1].values.astype('int32')
 
-# Extract features and labels
-X = np.array(df['2D_Array_Data'].apply(extract_amplitudes).tolist())
-y = df['Label'].values
+# Normalize the 12-bit ESP32 data (0 to 4095) to float values between 0.0 and 1.0
+X = X / 4095.0
 
-# Shuffle and split the dataset (80% Training, 20% Testing)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True, stratify=y)
+# Split into 80% training and 20% validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Feature Scaling (Crucial for Neural Network gradient descent convergence)
-# Replace the StandardScaler lines with this:
-X_train_scaled = X_train / 512.0
-X_test_scaled = X_test / 512.0
 # ==========================================
 # 2. NEURAL NETWORK ARCHITECTURE
 # ==========================================
 model = models.Sequential([
-    # Input layer expects a 1D array of 200 features
-    layers.Input(shape=(200,)),
+    layers.InputLayer(input_shape=(800,)),
     
-    # Hidden Layer 1
-    layers.Dense(100, activation='relu'),
-    layers.Dropout(0.2), # Prevents overfitting
-    
-    # Hidden Layer 2
+    # Hidden layers designed to compress the large 800-element array
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.3), # Prevents overfitting to background noise
     layers.Dense(64, activation='relu'),
+    layers.Dropout(0.2),
+    layers.Dense(32, activation='relu'),
     
-    # Output Layer (3 neurons for 3 classes, Softmax for probabilities)
+    # Output layer: 3 classes (Front, Reverse, Noise) using Softmax for probabilities
     layers.Dense(3, activation='softmax')
 ])
 
@@ -48,42 +42,54 @@ model.compile(optimizer='adam',
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
 
-# Train the model
-print("Commencing Model Training...")
-history = model.fit(X_train_scaled, y_train, epochs=3000, batch_size=16, validation_data=(X_test_scaled, y_test))
-# Evaluate final accuracy
-test_loss, test_acc = model.evaluate(X_test_scaled, y_test, verbose=0)
-print(f"\nFinal Test Accuracy: {test_acc * 100:.2f}%")
+print("Starting model training...")
+history = model.fit(X_train, y_train, epochs=50, batch_size=16, validation_data=(X_val, y_val))
 
 # ==========================================
 # 3. TENSORFLOW LITE MICRO CONVERSION
 # ==========================================
-# Convert the Keras model to a lightweight TFLite model optimized for ARM Cortex-M4
+print("Converting model to TensorFlow Lite format...")
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
-converter.optimizations = [tf.lite.Optimize.DEFAULT] # Applies 8-bit weight quantization
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
 tflite_model = converter.convert()
 
-# Save the binary .tflite file
-with open('acoustic_model.tflite', 'wb') as f:
+# Save the raw .tflite binary
+with open("model.tflite", "wb") as f:
     f.write(tflite_model)
 
 # ==========================================
-# 4. C++ BYTE ARRAY GENERATOR
+# 4. C++ HEADER FILE GENERATION
 # ==========================================
-# Microcontrollers cannot read .tflite files from a hard drive. 
-# The model must be converted into a C++ hex array to be compiled directly into flash memory.
-def hex_to_c_array(tflite_bytes, var_name):
-    c_str = f"const unsigned char {var_name}[] __attribute__((aligned(4))) = {{\n"
-    hex_array = [hex(b) for b in tflite_bytes]
+print("Generating model_data.h for ESP32...")
+
+def hex_to_c_array(hex_data, var_name):
+    c_str = ''
+    c_str += f'#ifndef {var_name.upper()}_H\n'
+    c_str += f'#define {var_name.upper()}_H\n\n'
+    c_str += f'#ifdef __has_attribute\n'
+    c_str += f'#define HAVE_ATTRIBUTE(x) __has_attribute(x)\n'
+    c_str += f'#else\n'
+    c_str += f'#define HAVE_ATTRIBUTE(x) 0\n'
+    c_str += f'#endif\n\n'
+    c_str += f'#if HAVE_ATTRIBUTE(aligned)\n'
+    c_str += f'#define ALIGN_ATTRIBUTE __attribute__((aligned(4)))\n'
+    c_str += f'#else\n'
+    c_str += f'#define ALIGN_ATTRIBUTE\n'
+    c_str += f'#endif\n\n'
+    c_str += f'const unsigned char {var_name}[] ALIGN_ATTRIBUTE = {{\n'
+    
+    # Format hex string into 12 columns per row
+    hex_array = [hex(b) for b in hex_data]
     for i in range(0, len(hex_array), 12):
-        c_str += "    " + ", ".join(hex_array[i:i+12]) + ",\n"
-    c_str += "};\n"
-    c_str += f"const int {var_name}_len = {len(tflite_bytes)};\n"
+        c_str += '  ' + ', '.join(hex_array[i:i+12]) + ',\n'
+        
+    c_str += '};\n\n'
+    c_str += f'const unsigned int {var_name}_len = {len(hex_data)};\n\n'
+    c_str += f'#endif // {var_name.upper()}_H\n'
     return c_str
 
-c_header_content = hex_to_c_array(tflite_model, "acoustic_nn_model")
+# Write the C++ header file
+with open("model_data.h", "w") as f:
+    f.write(hex_to_c_array(tflite_model, "acoustic_nn_model"))
 
-with open('model_data.h', 'w') as f:
-    f.write(c_header_content)
-
-print("\nModel successfully compiled and exported to 'model_data.h'")
+print("Complete. 'model_data.h' has been generated in the current directory.")

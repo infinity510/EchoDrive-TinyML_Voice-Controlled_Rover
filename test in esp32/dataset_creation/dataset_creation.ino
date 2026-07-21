@@ -1,97 +1,60 @@
-const int micPin = A0;
-const int buttonPin = 2;
-const int ledPin = 3;
-const int resetpin = 4;
-const int onboardLED = 13; 
+#define NUMBER_OF_INPUTS 200
 
-// 200 samples * 5ms interval = 1000ms (1 second capture window)
-const int numSamples = 200; 
-int features[numSamples];
+const int micPin = 34;
+const int buttonPin = 32;
+const int statusLedPin = 13;
 
-int ambientNoiseAverage = 0;
 int threshold = 0;
-const int thresholdMargin = 15; 
+const int thresholdMargin = 15;
 
-void setup() {
-  Serial.begin(115200); 
-  
+void setup()
+{
+  Serial.begin(115200);
   pinMode(buttonPin, INPUT_PULLUP);
-  pinMode(resetpin, INPUT_PULLUP);
-  pinMode(ledPin, OUTPUT);
-  pinMode(onboardLED, OUTPUT);
-  
-  digitalWrite(ledPin, LOW); 
-  digitalWrite(onboardLED, LOW);
-  
-  delay(1000); 
+  pinMode(statusLedPin, OUTPUT);
+  digitalWrite(statusLedPin, LOW);
+
   calibrateEnvironment();
 }
 
-void calibrateEnvironment() {
-  digitalWrite(onboardLED, HIGH);
-  
+void calibrateEnvironment()
+{
   long sumOfReadings = 0;
-  const int calibrationPasses = 10000;
-  
-  for (int i = 0; i < calibrationPasses; i++) {
+  for (int i = 0; i < 500; i++)
+  {
     sumOfReadings += analogRead(micPin);
-    delay(2); 
+    delay(2);
   }
-  
-  ambientNoiseAverage = sumOfReadings / calibrationPasses;
-  threshold = ambientNoiseAverage + thresholdMargin;
-  
-  digitalWrite(onboardLED, LOW);
-  
-  Serial.print("\n calliberation done threshold = ");
-  Serial.print(threshold);
-  Serial.println();
+  threshold = (sumOfReadings / 500) + thresholdMargin;
 }
 
-void loop() {
-  digitalWrite(ledPin, HIGH);
-  
-  while (digitalRead(buttonPin) == HIGH) {
-    if (digitalRead(resetpin) == LOW) {
-      digitalWrite(ledPin, LOW);
-      calibrateEnvironment();
-      delay(500); 
-      digitalWrite(ledPin, HIGH);
+void loop()
+{
+  while (digitalRead(buttonPin) == HIGH)
+  {
+    delay(10);
+  }
+
+  digitalWrite(statusLedPin, HIGH);
+
+  int raw_capture[NUMBER_OF_INPUTS];
+  for (int i = 0; i < NUMBER_OF_INPUTS; i++)
+  {
+    raw_capture[i] = analogRead(micPin) - threshold;
+    delay(5);
+  }
+
+  digitalWrite(statusLedPin, LOW);
+
+  for (int i = 0; i < NUMBER_OF_INPUTS; i++)
+  {
+    Serial.print(raw_capture[i]);
+    if (i < NUMBER_OF_INPUTS - 1)
+    {
+      Serial.print(",");
     }
   }
-  
-  digitalWrite(ledPin, LOW);
-  
-  // 1. CAPTURE PHASE & AVERAGE CALCULATION
-  long captureSum = 0;
-  Serial.println("speakup");
-  delay(100);
-  
-  for (int i = 0; i < numSamples; i++) {
-    features[i] = analogRead(micPin) - threshold;
-    captureSum += features[i];
-    delay(5); 
-  }
-  
-  int currentCaptureAverage = captureSum / numSamples;
-  
-  // 2. TEXT FORMATTING & TRANSMISSION
-  Serial.print("threshold = ");
-  Serial.println(threshold);
-  
-  Serial.print("average reading = ");
-  Serial.println(currentCaptureAverage);
-  
-  // Print exactly 100 values sequentially downwards for Python to parse
-  int printCount = 200; 
-  for (int i = 0; i < printCount; i++) {
-    // CRITICAL FIX: Serial.println ensures each value is on its own line
-    Serial.println(features[i]); 
-    delay(2); 
-  }
-  
-  Serial.println(" \n readings successfully taken press again to go to next reading");
-  
-  // 3. DEBOUNCE
-  delay(500); 
+  Serial.println();
+
+  delay(1000);
 }

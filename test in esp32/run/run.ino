@@ -19,8 +19,8 @@ Eloquent::TinyML::TensorFlow::TensorFlow<NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS, TE
 // 3. HARDWARE PIN DEFINITIONS (ESP32)
 // ==========================================
 const int micPin = 34; 
-const int buttonPin = 18; 
-const int ledPin = 2; 
+const int buttonPin = 32; 
+const int ledPin = 13; 
 const int leftMotorForward = 25; 
 const int rightMotorForward = 26;
 
@@ -101,7 +101,7 @@ void loop() {
   Serial.println(confidence);
   
   // Phase 4: Hardware Actuation
-  if (predicted_class == 0 && confidence > 0.70) {
+  if (predicted_class == 0 && confidence > 0.60) {
     Serial.println("Actuation: Executing FRONT command logic sequence.");
     digitalWrite(leftMotorForward, HIGH);
     digitalWrite(rightMotorForward, HIGH);
