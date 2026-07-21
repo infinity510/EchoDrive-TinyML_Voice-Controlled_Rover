@@ -12,7 +12,7 @@
 #define NUMBER_OF_OUTPUTS 3
 
 // Expanded from 16KB to 32KB to accommodate the larger 800-element dense layers
-#define TENSOR_ARENA_SIZE 32768
+#define TENSOR_ARENA_SIZE 62768
 
 Eloquent::TinyML::TensorFlow::TensorFlow<NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS, TENSOR_ARENA_SIZE> ml;
 
@@ -44,14 +44,19 @@ static unsigned long triggerCount = 0;
 void calibrateEnvironment() {
   long sumOfReadings = 0;
 
-  for (int i = 0; i < 500; i++) {
+  for (int i = 0; i < 100; i++) {
     sumOfReadings += analogRead(micPin);
     delay(2);
   }
-
-  threshold = (sumOfReadings / 500) + thresholdMargin;
+  threshold = (sumOfReadings / 100) + thresholdMargin;
   Serial.print("Diagnostic: Environmental calibration complete. Noise floor threshold set to: ");
   Serial.println(threshold);
+ for (int blink = 0; blink < 5; blink++) {
+      digitalWrite(statusLedPin, HIGH);
+      delay(10);
+      digitalWrite(statusLedPin, LOW);
+      delay(10);
+    }
 }
 
 // ==========================================
@@ -88,7 +93,7 @@ void setup() {
 // 7. MAIN EXECUTION LOOP
 // ==========================================
 void loop() {
-  if (triggerCount % 5 == 0) {
+  if (triggerCount % 2 == 0) {
     calibrateEnvironment();
   }
 
